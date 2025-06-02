@@ -96,7 +96,7 @@ async def activate(
             ActivationTokenModel.token == activation_data.token,
             ActivationTokenModel.expires_at > datetime.now(timezone.utc),
             ActivationTokenModel.user == user,
-            ActivationTokenModel.is_used == False,
+            ActivationTokenModel.is_used == False,  # noqa: E712
         )
     )
 
@@ -167,7 +167,7 @@ async def reset_password(
             select(PasswordResetTokenModel).where(
                 PasswordResetTokenModel.user == user,
                 PasswordResetTokenModel.token == reset_password_data.token,
-                PasswordResetTokenModel.is_used == False,
+                PasswordResetTokenModel.is_used == False,  # noqa: E712
             )
         )
 
@@ -286,7 +286,7 @@ async def refresh_access_token(
         select(RefreshTokenModel).where(
             RefreshTokenModel.token == refresh_access_token_data.refresh_token,
             RefreshTokenModel.expires_at >= datetime.now(timezone.utc),
-            RefreshTokenModel.is_used == False,
+            RefreshTokenModel.is_used == False,  # noqa: E712
         )
     )
 
