@@ -13,6 +13,7 @@ from sqlalchemy import (
     Text,
     Date,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
@@ -175,6 +176,9 @@ class TokenBaseModel(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc) + timedelta(days=1),
     )
+    is_used: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
@@ -211,9 +215,6 @@ class RefreshTokenModel(TokenBaseModel):
     __tablename__ = "refresh_tokens"
 
     user: Mapped[UserModel] = relationship("UserModel", back_populates="refresh_tokens")
-    token: Mapped[str] = mapped_column(
-        String(512), unique=True, nullable=False, default=generate_secure_token
-    )
 
     @classmethod
     def create(

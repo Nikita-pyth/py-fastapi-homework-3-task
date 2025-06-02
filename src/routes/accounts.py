@@ -96,15 +96,20 @@ async def activate(
             ActivationTokenModel.token == activation_data.token,
             ActivationTokenModel.expires_at > datetime.now(timezone.utc),
             ActivationTokenModel.user == user,
+            ActivationTokenModel.is_used == False,
         )
     )
 
     if token:
         await db.execute(
-            update(UserModel).where(UserModel.id == user.id).values(is_active=True)
+            update(ActivationTokenModel)
+            .where(ActivationTokenModel.id == token.id)
+            .values(is_used=True)
         )
 
-        await db.flush()
+        await db.execute(
+            update(UserModel).where(UserModel.id == user.id).values(is_active=True)
+        )
 
         await db.execute(
             delete(ActivationTokenModel).where(ActivationTokenModel.id == token.id)
@@ -162,26 +167,25 @@ async def reset_password(
             select(PasswordResetTokenModel).where(
                 PasswordResetTokenModel.user == user,
                 PasswordResetTokenModel.token == reset_password_data.token,
+                PasswordResetTokenModel.is_used == False,
             )
         )
 
         if password_reset_token and cast(
             datetime, password_reset_token.expires_at
         ).replace(tzinfo=timezone.utc) >= datetime.now(timezone.utc):
+            await db.execute(
+                update(PasswordResetTokenModel)
+                .where(PasswordResetTokenModel.id == password_reset_token.id)
+                .values(is_used=True)
+            )
+
             hashed_password = hash_password(reset_password_data.password)
 
             await db.execute(
                 update(UserModel)
                 .where(UserModel.id == user.id)
                 .values(_hashed_password=hashed_password)
-            )
-
-            await db.flush()
-
-            await db.execute(
-                delete(PasswordResetTokenModel).where(
-                    PasswordResetTokenModel.id == password_reset_token.id
-                )
             )
 
             await db.commit()
@@ -282,6 +286,7 @@ async def refresh_access_token(
         select(RefreshTokenModel).where(
             RefreshTokenModel.token == refresh_access_token_data.refresh_token,
             RefreshTokenModel.expires_at >= datetime.now(timezone.utc),
+            RefreshTokenModel.is_used == False,
         )
     )
 
@@ -290,9 +295,17 @@ async def refresh_access_token(
             status.HTTP_401_UNAUTHORIZED, detail="Refresh token not found."
         )
 
+    await db.execute(
+        update(RefreshTokenModel)
+        .where(RefreshTokenModel.id == token.id)
+        .values(is_used=True)
+    )
+
     user = await db.scalar(select(UserModel).where(UserModel.id == decoded["user_id"]))
 
     if not user or token.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    await db.commit()
 
     return {"access_token": jwt_manager.create_access_token({"user_id": user.id})}
